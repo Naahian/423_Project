@@ -43,10 +43,87 @@ class PhysicsObject:
         self.collidable = True
         self.rotation = Vector3(0, 0, 0)  # Rotation around x, y, z
         self.color = (0.5, 0.5, 0.5)  # Default color (gray)
+        
+        # Gravity settings
+        self.gravity_enabled = True  # Whether gravity affects this object
+        self.gravity_strength = -9.8  # Gravity acceleration (negative = downward)
+        self.on_ground = False  # Whether the object is touching the ground
+        self.ground_level = 0.0  # Ground level (floor Y position)
+        self.bounce_factor = 0.3  # How bouncy the object is (0.0 = no bounce, 1.0 = perfect bounce)
+        self.friction = 0.95  # Air resistance/friction (0.0 = stops immediately, 1.0 = no friction)
 
     def update(self, delta_time):
+        """Update physics with gravity"""
+        if self.gravity_enabled:
+            self.apply_gravity(delta_time)
+        
+        # Apply movement
         self.position += self.velocity * delta_time
+        
+        # Handle ground collision
+        self.handle_ground_collision()
+        
+        # Handle other collisions
         self.handle_collision()
+        
+        # Apply friction
+        self.apply_friction()
+
+    def apply_gravity(self, delta_time):
+        """Apply gravity to the object"""
+        if not self.on_ground:
+            # Add gravity to Y velocity (downward acceleration)
+            self.velocity.y += self.gravity_strength * delta_time
+
+    def handle_ground_collision(self):
+        """Handle collision with the ground"""
+        # Calculate the bottom of the object
+        object_bottom = self.position.y - (self.height / 2)
+        
+        # Check if object hits the ground
+        if object_bottom <= self.ground_level:
+            # Place object on ground
+            self.position.y = self.ground_level + (self.height / 2)
+            
+            # Handle bouncing
+            if self.velocity.y < 0:  # Only bounce if moving downward
+                self.velocity.y = -self.velocity.y * self.bounce_factor
+                
+                # Stop tiny bounces
+                if abs(self.velocity.y) < 0.1:
+                    self.velocity.y = 0
+                    self.on_ground = True
+            else:
+                self.on_ground = True
+        else:
+            self.on_ground = False
+
+    def apply_friction(self):
+        """Apply air resistance/friction to all movement"""
+        self.velocity.x *= self.friction
+        self.velocity.z *= self.friction
+        
+        # Only apply Y friction if object is moving very slowly
+        if abs(self.velocity.y) < 0.1:
+            self.velocity.y *= self.friction
+
+    def jump(self, force=5.0):
+        """Make the object jump (add upward velocity)"""
+        if self.on_ground:  # Can only jump when on ground
+            self.velocity.y = force
+            self.on_ground = False
+
+    def add_force(self, force_vector):
+        """Add a force to the object (changes velocity)"""
+        self.velocity += force_vector
+
+    def set_gravity_enabled(self, enabled):
+        """Enable or disable gravity for this object"""
+        self.gravity_enabled = enabled
+
+    def set_ground_level(self, y_level):
+        """Set the ground level for this object"""
+        self.ground_level = y_level
 
     def handle_collision(self):
         """Logic to handle collision, currently no resolution."""
@@ -54,12 +131,12 @@ class PhysicsObject:
 
     def check_collision(self, other):
         """Check if this object collides with another object (in 3D)."""
-        return (self.position.x < other.position.x + other.width and
-                self.position.x + self.width > other.position.x and
-                self.position.y < other.position.y + other.height and
-                self.position.y + self.height > other.position.y and
-                self.position.z < other.position.z + other.depth and
-                self.position.z + self.depth > other.position.z)
+        return (self.position.x - self.width/2 < other.position.x + other.width/2 and
+                self.position.x + self.width/2 > other.position.x - other.width/2 and
+                self.position.y - self.height/2 < other.position.y + other.height/2 and
+                self.position.y + self.height/2 > other.position.y - other.height/2 and
+                self.position.z - self.depth/2 < other.position.z + other.depth/2 and
+                self.position.z + self.depth/2 > other.position.z - other.depth/2)
 
     def draw(self):
         """Draw the 3D object."""

@@ -1,68 +1,40 @@
-from physics_object import PhysicsObject, Vector3
+#entity
+
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 
+from physics_object import PhysicsObject, Vector3
 
 
-# Floor Class
+# Player Entity
+class Player(PhysicsObject):
+    """The player character represented as a blue cube."""
+    def __init__(self, position, velocity, width=1.0, height=2.0, depth=1.0):
+        super().__init__(position, velocity, width, height, depth)
+        self.color = (0.0, 0.0, 1.0)  # Blue
+
+    def render(self):
+        glPushMatrix()
+        glScalef(self.width, self.height, self.depth)
+        glutSolidCube(1)
+        glPopMatrix()
+
+
+# Floor Entity
 class Floor(PhysicsObject):
-    def __init__(self, position=Vector3(0, 0, 0), width=300, height=300, depth=1):
+    """Large green ground for the farm."""
+    def __init__(self, position, width=50.0, height=1.0, depth=50.0):
         super().__init__(position, Vector3(0, 0, 0), width, height, depth)
-        self.color = (0.3, 0.6, 0.1) 
-
-    def draw(self):
-        glPushMatrix()
-
-        glTranslatef(self.position.x, self.position.y, self.position.z)        
-        glColor3f(*self.color) 
-        glScalef(self.width, self.depth, self.height) 
-        glutSolidCube(1)  
-
-        glPopMatrix()
-
-
-        #---CROPS---
-class Crop(PhysicsObject):
-    
-    def __init__(self, position, width=1.0, height=1.0, depth=1.0):
-        super().__init__(position, Vector3(0, 0, 0), width, height, depth)
-        self.growth_stage = 0  #0 = seed, 1 =sprout, 2 = grown
-        self.color = (0.6, 0.4, 0.2)  # Brown seed
-
-    def grow(self):
-        if self.growth_stage < 2:
-            self.growth_stage += 1
-
-        if self.growth_stage == 1:
-            self.color = (0.2, 0.8, 0.2)  #Green sprout
-            self.height = 2.0
-        elif self.growth_stage == 2:
-            self.color = (1.0, 1.0, 0.0)  #Yellow harvest-ready
-            self.height = 3.0
+        self.color = (0.2, 0.8, 0.2)  # Green ground
 
     def render(self):
-        """Render crop as a small scaled cube."""
         glPushMatrix()
         glScalef(self.width, self.height, self.depth)
         glutSolidCube(1)
         glPopMatrix()
 
 
-#---BUILDING----
-class Building(PhysicsObject):
-    #Farmhouse, barn, etc
-
-    def __init__(self, position, width=5.0, height=5.0, depth=5.0):
-        super().__init__(position, Vector3(0, 0, 0), width, height, depth)
-        self.color = (0.7, 0.3, 0.1)  #Brown building
-
-    def render(self):
-        #Rendering as a scaled cube (placeholder for house)."""
-        glPushMatrix()
-        glScalef(self.width, self.height, self.depth)
-        glutSolidCube(1)
-        glPopMatrix()
 # Building (Farmhouse)
 class Building(PhysicsObject):
     """A simple farmhouse with cube base and triangular roof."""
