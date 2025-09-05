@@ -4,13 +4,17 @@ from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from ui import *
-from entities import *
+from floor import *
+from crop import *
+from building import *
 from player import Player
 from physics_object import Vector3
+import time
 
 # Global game state
 game_state = {
-    'entities': [],
+    'ui_entities': [],
+    'world_entities': [],
     'systems': [],
     'player': None,
     'elapsed_sec': 0,
@@ -19,21 +23,25 @@ game_state = {
     'camera_up': [0.0, 1.0, 0.0],
     'last_mouse_x': 400,
     'last_mouse_y': 300,
-    'mouse_initialized': False
+    'mouse_initialized': False,
+    'light_pos': [15.0, 40.0, 30.0, 1.0]
 }
 
+
 DELTA_TIME = 1.0 / 60.0  # 60 FPS
+start_time = time.time()
 
 
 def setup_lighting():
     """Configure OpenGL lighting."""
+    global game_state
     glEnable(GL_LIGHTING)
     glEnable(GL_LIGHT0)
     glEnable(GL_COLOR_MATERIAL)
 
     # Light configuration
     light_props = {
-        GL_POSITION: [10.0, 10.0, 10.0, 1.0],
+        GL_POSITION: game_state['light_pos'],
         GL_AMBIENT: [0.2, 0.2, 0.2, 1.0],
         GL_DIFFUSE: [0.8, 0.8, 0.8, 1.0],
         GL_SPECULAR: [1.0, 1.0, 1.0, 1.0]
@@ -53,7 +61,7 @@ def setup_projection():
 
 def setup_opengl():
     """Initialize OpenGL settings."""
-    glClearColor(0.0, 0.0, 0.0, 1.0)
+    glClearColor(0.85, 0.88, 1.0, 1.0)
     glEnable(GL_DEPTH_TEST)
     setup_lighting()
     setup_projection()
@@ -70,31 +78,37 @@ def set_camera_view():
 
 def render_scene():
     """Render the complete game scene."""
+    global game_state
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
     glLoadIdentity()
     
     set_camera_view()
     
-    for entity in game_state['entities']:
+    for entity in game_state['ui_entities']:
+        entity.draw()
+    for entity in game_state['world_entities']:
         entity.draw()
     
+    draw_sun(game_state)
+
     glutSwapBuffers()
+
+
 
 
 def update_timer():
     """Update the game timer."""
-    game_state['elapsed_sec'] = (game_state['elapsed_sec'] + 1) % 60
-    print(game_state['elapsed_sec'])
 
-#####################################################################################
-################################ DEV START ##########################################
+
+#######################################################################################
+#######################################################################################
 
 def handle_special_events():
     """Process special timed events."""
-    if game_state['elapsed_sec'] == 2 and len(game_state['entities']) > 3:
-        entities = game_state['entities']
-        # entities[3].update(entities[3].stage + 1)
-
+    # plant update
+    # harvest update
+    # etc
 
 def update_player(delta_time):
     """Update player movement and state."""
@@ -110,23 +124,34 @@ def update_player(delta_time):
 
 def update_game(delta_time):
     """Update all game systems."""
-    update_timer()
+    global game_state
+    
     handle_special_events()
     update_player(delta_time)
+    
+    if(game_state['mouse_initialized']):
+        glutSetCursor(GLUT_CURSOR_NONE)
+    else:
+        glutSetCursor(GLUT_CURSOR_LEFT_ARROW)
 
 
 def game_loop():
     """Main game loop called by GLUT idle function."""
     update_game(DELTA_TIME)
     render_scene()
+    update_timer()
 
 
 def handle_keyboard_down(key, x, y):
     """Process keyboard key press events."""
+    global game_state
     player = game_state['player']
     
     if key == b'\x1b':  # Escape key
-        sys.exit(0)
+        game_state['mouse_initialized'] = not game_state['mouse_initialized']
+    
+    if key == b't':
+        print(game_state['elapsed_sec'])
 
     # Movement keys
     if key in [b'w', b'a', b's', b'd'] and player:
@@ -134,7 +159,7 @@ def handle_keyboard_down(key, x, y):
     
     # Action keys
     elif key in [b'e', b'r', b'f'] and player:
-        player.action(key, game_state['entities'])
+        player.action(key, game_state['world_entities'])
 
 
 def handle_keyboard_up(key, x, y):
@@ -160,7 +185,6 @@ def handle_mouse_movement(x, y):
     if not game_state['mouse_initialized']:
         game_state['last_mouse_x'] = x
         game_state['last_mouse_y'] = y
-        game_state['mouse_initialized'] = True
         return
 
     dx = x - game_state['last_mouse_x']
@@ -178,13 +202,13 @@ def handle_mouse_movement(x, y):
     game_state['last_mouse_x'] = x
     game_state['last_mouse_y'] = y
     
-    recenter_mouse_if_needed(x, y)
+    # recenter_mouse_if_needed(x, y)
 
 
 def create_player():
     """Create and return the player entity."""
     return Player(
-        position=Vector3(0.0, 1.0, 0.0),
+        position=Vector3(0.0, 0.2, 0.0),
         velocity=Vector3(0.0, 0.0, 0.0),
         width=2.0, height=2.0, depth=2.0
     )
@@ -194,11 +218,12 @@ def create_world_entities():
     """Create and return world entities."""
     floor = Floor(
         position=Vector3(0.0, -1.0, 0.0),
-        width=30.0, height=30.0, depth=1.0
+        width=100.0, height=100.0, depth=1.0,
+        texture_file= "assets/terrain.jpg",
+        texture_repeat= 30
     )
-    
-    crop = Crop(Vector3(0, 1, 0))
-    building = Building(Vector3(4, 4, 0))
+    crop = Crop(Vector3(0, -1, 0))
+    building = Building(Vector3(4, 0, 0), wall_texture="assets/wall.jpg",roof_texture="assets/roof.png")
     
     return [floor, crop, building]
 
@@ -213,28 +238,35 @@ def create_ui_entities():
     ]
 
 
+
+###########################################################################################
+###########################################################################################
+
 def initialize_entities():
     """Initialize all game entities."""
     game_state['player'] = create_player()
+    
     ui_entities = create_ui_entities()
     world_entities = create_world_entities()
-    game_state['entities'] = ui_entities + world_entities
+    
+    game_state['ui_entities'] = ui_entities
+    game_state['world_entities'] = world_entities
 
-
-################################## DEV END ##########################################
-#####################################################################################
 
 def setup_glut_window():
     """Initialize GLUT window and settings."""
+    global game_state
     glutInit(sys.argv)
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH)
     glutInitWindowSize(800, 600)
-    glutCreateWindow(b"Farming Sim Game")
+    glutInitWindowPosition(1,-1)
+    glutCreateWindow(b"Farming Game")
     glutSetCursor(GLUT_CURSOR_NONE)
-
+    
 
 def register_callbacks():
     """Register all GLUT callback functions."""
+    global game_state
     glutDisplayFunc(render_scene)
     glutIdleFunc(game_loop)
     glutKeyboardFunc(handle_keyboard_down)
@@ -245,14 +277,16 @@ def register_callbacks():
 
 def initialize_game():
     """Initialize the complete game."""
+    global game_state
     setup_glut_window()
     setup_opengl()
     initialize_entities()
     register_callbacks()
-
+    game_state['mouse_initialized'] = True
 
 def main():
     """Main entry point for the game."""
+    global game_state
     initialize_game()
     glutMainLoop()
 

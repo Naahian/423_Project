@@ -1,7 +1,6 @@
 
 import math
-
-from entities import Crop
+from crop import Crop
 from physics_object import Vector3
 
 
@@ -18,6 +17,8 @@ class Player:
         self.pitch = 0.0
         self.mouse_sensitivity = 0.005
         
+
+
         # Movement
         self.move_speed = 1.0
         self.keys = {'w': False, 'a': False, 's': False, 'd': False}
@@ -39,34 +40,57 @@ class Player:
 
     def update_movement(self, delta_time, camera_position, camera_target, camera_up):
         """Update player movement based on currently pressed keys"""
-        # Calculate movement based on camera orientation
-        move_x = 0.0
-        move_z = 0.0
+        # Calculate camera forward vector (normalized)
+        forward_x = camera_target[0] - camera_position[0]
+        forward_y = camera_target[1] - camera_position[1]
+        forward_z = camera_target[2] - camera_position[2]
+        
+        # Normalize the forward vector
+        forward_length = math.sqrt(forward_x**2 + forward_y**2 + forward_z**2)
+        if forward_length > 0:
+            forward_x /= forward_length
+            forward_y /= forward_length
+            forward_z /= forward_length
+        
+        # Calculate right vector (cross product of forward and up)
+        right_x = forward_z * camera_up[1] - forward_y * camera_up[2]
+        right_y = forward_x * camera_up[2] - forward_z * camera_up[0]
+        right_z = forward_y * camera_up[0] - forward_x * camera_up[1]
+        
+        # Normalize the right vector
+        right_length = math.sqrt(right_x**2 + right_y**2 + right_z**2)
+        if right_length > 0:
+            right_x /= right_length
+            right_y /= right_length
+            right_z /= right_length
+        
+        # Calculate movement direction based on keys
+        move_x, move_y, move_z = 0.0, 0.0, 0.0
         
         if self.keys['w']:  # Forward
-            move_x += math.cos(self.yaw) * self.move_speed * delta_time
-            move_z += math.sin(self.yaw) * self.move_speed * delta_time
+            move_x += forward_x * self.move_speed * delta_time
+            move_z += forward_z * self.move_speed * delta_time
         if self.keys['s']:  # Backward
-            move_x -= math.cos(self.yaw) * self.move_speed * delta_time
-            move_z -= math.sin(self.yaw) * self.move_speed * delta_time
-        if self.keys['a']:  # Left
-            move_x += math.cos(self.yaw - math.pi/2) * self.move_speed * delta_time
-            move_z += math.sin(self.yaw - math.pi/2) * self.move_speed * delta_time
-        if self.keys['d']:  # Right
-            move_x += math.cos(self.yaw + math.pi/2) * self.move_speed * delta_time
-            move_z += math.sin(self.yaw + math.pi/2) * self.move_speed * delta_time
-            
-        # Update player position
+            move_x -= forward_x * self.move_speed * delta_time
+            move_z -= forward_z * self.move_speed * delta_time
+        if self.keys['a']:  # Left (strafe)
+            move_x += right_x * self.move_speed * delta_time
+            move_z += right_z * self.move_speed * delta_time
+        if self.keys['d']:  # Right (strafe)
+            move_x -= right_x * self.move_speed * delta_time
+            move_z -= right_z * self.move_speed * delta_time
+        
+        # Update player position (ignore Y movement for ground-based movement)
         self.position.x += move_x
         self.position.z += move_z
         
         # Update camera to follow player
         self.update_camera(camera_position, camera_target)
-
+        
     def update_camera(self, camera_position, camera_target):
         """Update camera position and target based on player position and rotation"""
-        camera_distance = 6.0
-        base_height = 5.0
+        camera_distance = 3.5
+        base_height = 2.5
         
         # Calculate camera position behind the player using both yaw and pitch
         camera_position[0] = self.position.x - camera_distance * math.cos(self.yaw) * math.cos(self.pitch)

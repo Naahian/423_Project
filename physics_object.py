@@ -2,6 +2,34 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 import math
+import numpy as np
+from PIL import Image
+
+
+
+def load_texture(filename):
+    """Load texture from image file."""
+    try:
+        image = Image.open(filename)
+        image = image.convert('RGB')
+        image_data = np.array(image, dtype=np.uint8)
+        
+        texture_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        
+        height, width = image_data.shape[:2]
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, 
+                    GL_RGB, GL_UNSIGNED_BYTE, image_data)
+        
+        return texture_id
+    except:
+        return None
+
 
 # Vector3 Class
 class Vector3:
