@@ -8,200 +8,254 @@ from entities import *
 from player import Player
 from physics_object import Vector3
 
+# Global game state
+game_state = {
+    'entities': [],
+    'systems': [],
+    'player': None,
+    'elapsed_sec': 0,
+    'camera_position': [5.0, 5.0, 15.0],
+    'camera_target': [0.0, 0.0, 0.0],
+    'camera_up': [0.0, 1.0, 0.0],
+    'last_mouse_x': 400,
+    'last_mouse_y': 300,
+    'mouse_initialized': False
+}
+
+DELTA_TIME = 1.0 / 60.0  # 60 FPS
 
 
-# Global variables for the game
-camera_position = [5.0, 5.0, 15.0]  # Where the camera is
-camera_target = [0.0, 0.0, 0.0]     # What the camera looks at
-camera_up = [0.0, 1.0, 0.0]         # What is "up" for the camera
-timer = None 
-elapsed_sec = 0;
+def setup_lighting():
+    """Configure OpenGL lighting."""
+    glEnable(GL_LIGHTING)
+    glEnable(GL_LIGHT0)
+    glEnable(GL_COLOR_MATERIAL)
+
+    # Light configuration
+    light_props = {
+        GL_POSITION: [10.0, 10.0, 10.0, 1.0],
+        GL_AMBIENT: [0.2, 0.2, 0.2, 1.0],
+        GL_DIFFUSE: [0.8, 0.8, 0.8, 1.0],
+        GL_SPECULAR: [1.0, 1.0, 1.0, 1.0]
+    }
+    
+    for prop, values in light_props.items():
+        glLightfv(GL_LIGHT0, prop, values)
 
 
-entities = []
-systems = []
-
-player = None
-last_mouse_x = 400
-last_mouse_y = 300
-mouse_initialized = False
-
-def setup_opengl():
-    """Setup the OpenGL environment (viewport, projection, etc.)."""
-    glClearColor(0.0, 0.0, 0.0, 1.0)
-    glEnable(GL_DEPTH_TEST)
-
-    # --- Lighting ---
-    glEnable(GL_LIGHTING)        # Enable lighting
-    glEnable(GL_LIGHT0)          # Enable light source 0
-    glEnable(GL_COLOR_MATERIAL)  # Enable material coloring via glColor*
-
-    # Light position and color
-    light_position = [10.0, 10.0, 10.0, 1.0]  # Positional light
-    light_ambient = [0.2, 0.2, 0.2, 1.0]
-    light_diffuse = [0.8, 0.8, 0.8, 1.0]
-    light_specular = [1.0, 1.0, 1.0, 1.0]
-
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position)
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient)
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse)
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular)
-
-    # Projection
+def setup_projection():
+    """Configure OpenGL projection matrix."""
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
     gluPerspective(45.0, 800.0 / 600.0, 0.5, 100.0)
-
     glMatrixMode(GL_MODELVIEW)
 
-def render_scene():
-    """Called by GLUT to render the game scene."""
-    global entities, camera_position, camera_target, camera_up
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen and depth buffer
-    glLoadIdentity()  # Reset transformations
+def setup_opengl():
+    """Initialize OpenGL settings."""
+    glClearColor(0.0, 0.0, 0.0, 1.0)
+    glEnable(GL_DEPTH_TEST)
+    setup_lighting()
+    setup_projection()
 
-    # Set up camera view - REMOVED the conflicting glTranslatef
+
+def set_camera_view():
+    """Set up the camera view matrix."""
     gluLookAt(
-        camera_position[0], camera_position[1], camera_position[2],  # Eye (camera position)
-        camera_target[0], camera_target[1], camera_target[2],        # Center (look-at point)
-        camera_up[0], camera_up[1], camera_up[2]                     # Up vector
+        *game_state['camera_position'],
+        *game_state['camera_target'],
+        *game_state['camera_up']
     )
 
-    # Draw all entities
-    for entity in entities:
-        entity.draw()  # Draw the entity
+
+def render_scene():
+    """Render the complete game scene."""
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glLoadIdentity()
     
-    # Swap buffers to display the frame
+    set_camera_view()
+    
+    for entity in game_state['entities']:
+        entity.draw()
+    
     glutSwapBuffers()
 
-def update_game(delta_time):
-    """Update game logic (physics, systems, etc.)."""
-    global player, camera_position, camera_target, camera_up, entities, elapsed_sec
-    print(elapsed_sec)
-    if(elapsed_sec == 2):
-        entities[3].update(entities[3].stage+1)
-    
+
+def update_timer():
+    """Update the game timer."""
+    game_state['elapsed_sec'] = (game_state['elapsed_sec'] + 1) % 60
+    print(game_state['elapsed_sec'])
+
+#####################################################################################
+################################ DEV START ##########################################
+
+def handle_special_events():
+    """Process special timed events."""
+    if game_state['elapsed_sec'] == 2 and len(game_state['entities']) > 3:
+        entities = game_state['entities']
+        # entities[3].update(entities[3].stage + 1)
+
+
+def update_player(delta_time):
+    """Update player movement and state."""
+    player = game_state['player']
     if player:
-        player.update_movement(delta_time, camera_position, camera_target, camera_up)
+        player.update_movement(
+            delta_time,
+            game_state['camera_position'],
+            game_state['camera_target'],
+            game_state['camera_up']
+        )
 
-    delta_time
 
-def idle_func():
-    """Called when GLUT is idle. Keep updating the game loop."""
-    delta_time = 0.016  # Simulate 60 FPS (1/60)
-    update_game(delta_time)
-    render_scene()  # Re-render the scene after the update
+def update_game(delta_time):
+    """Update all game systems."""
+    update_timer()
+    handle_special_events()
+    update_player(delta_time)
+
+
+def game_loop():
+    """Main game loop called by GLUT idle function."""
+    update_game(DELTA_TIME)
+    render_scene()
+
 
 def handle_keyboard_down(key, x, y):
-    """Handle keyboard key press."""
-    global player, entities
+    """Process keyboard key press events."""
+    player = game_state['player']
     
     if key == b'\x1b':  # Escape key
-        sys.exit(0)  # Exit the game
+        sys.exit(0)
 
     # Movement keys
-    if key in [b'w', b'a', b's', b'd']:
-        if player:
-            player.set_key_state(key, True)
+    if key in [b'w', b'a', b's', b'd'] and player:
+        player.set_key_state(key, True)
     
     # Action keys
-    elif key in [b'e', b'r', b'f']:
-        if player:
-            player.action(key, entities)
+    elif key in [b'e', b'r', b'f'] and player:
+        player.action(key, game_state['entities'])
+
 
 def handle_keyboard_up(key, x, y):
-    """Handle keyboard key release."""
-    global player
+    """Process keyboard key release events."""
+    player = game_state['player']
     
-    # Movement keys
-    if key in [b'w', b'a', b's', b'd']:
-        if player:
-            player.set_key_state(key, False)
+    if key in [b'w', b'a', b's', b'd'] and player:
+        player.set_key_state(key, False)
 
-def handle_mouse(x, y):
-    """Handle mouse movement for camera"""
-    global player, last_mouse_x, last_mouse_y, camera_position, camera_target, camera_up, mouse_initialized
+
+def recenter_mouse_if_needed(x, y):
+    """Recenter mouse cursor if it moves too far from center."""
+    center_x, center_y = 400, 300
     
-    # Initialize mouse position on first call
-    if not mouse_initialized:
-        last_mouse_x = x
-        last_mouse_y = y
-        mouse_initialized = True
+    if abs(x - center_x) > 200 or abs(y - center_y) > 150:
+        glutWarpPointer(center_x, center_y)
+        game_state['last_mouse_x'] = center_x
+        game_state['last_mouse_y'] = center_y
+
+
+def handle_mouse_movement(x, y):
+    """Process mouse movement for camera control."""
+    if not game_state['mouse_initialized']:
+        game_state['last_mouse_x'] = x
+        game_state['last_mouse_y'] = y
+        game_state['mouse_initialized'] = True
         return
+
+    dx = x - game_state['last_mouse_x']
+    dy = y - game_state['last_mouse_y']
     
-    dx = x - last_mouse_x
-    dy = y - last_mouse_y
+    player = game_state['player']
+    if (dx != 0 or dy != 0) and player:
+        player.mouse_look(
+            dx, dy,
+            game_state['camera_position'],
+            game_state['camera_target'],
+            game_state['camera_up']
+        )
     
-    if (abs(dx) > 0 or abs(dy) > 0) and player:
-        player.mouse_look(dx, dy, camera_position, camera_target, camera_up)
+    game_state['last_mouse_x'] = x
+    game_state['last_mouse_y'] = y
     
-    last_mouse_x = x
-    last_mouse_y = y
+    recenter_mouse_if_needed(x, y)
 
-    # Keep mouse centered for FPS-style controls (optional)
-    window_center_x, window_center_y = 400, 300
-    if abs(x - window_center_x) > 200 or abs(y - window_center_y) > 150:
-        glutWarpPointer(window_center_x, window_center_y)
-        last_mouse_x = window_center_x
-        last_mouse_y = window_center_y
 
-def elapse_time():
-    global elapsed_sec
-    elapsed_sec = (elapsed_sec+1)%60
+def create_player():
+    """Create and return the player entity."""
+    return Player(
+        position=Vector3(0.0, 1.0, 0.0),
+        velocity=Vector3(0.0, 0.0, 0.0),
+        width=2.0, height=2.0, depth=2.0
+    )
 
-def init_game():
-    """Initialize the game objects and systems."""
-    global player, entities, systems, timer
 
-    # Create game entities
-    player = Player(position=Vector3(0.0, 1.0, 0.0), 
-                    velocity=Vector3(0.0, 0.0, 0.0), 
-                    width=2.0,  
-                    height=2.0, 
-                    depth=2.0)  
-
-    floor = Floor(position=Vector3(0.0, -1.0, 0.0),  
-                width=30.0,  
-                height=30.0, 
-                depth=1.0)  
+def create_world_entities():
+    """Create and return world entities."""
+    floor = Floor(
+        position=Vector3(0.0, -1.0, 0.0),
+        width=30.0, height=30.0, depth=1.0
+    )
     
     crop = Crop(Vector3(0, 1, 0))
     building = Building(Vector3(4, 4, 0))
-    healthBar = HealthBar()
-    energyBar = EnergyBar()
-    houseIcon = HouseIcon()
-    cropGrowthBar = CropGrowthBar()
+    
+    return [floor, crop, building]
 
-    entities = [healthBar, energyBar, houseIcon, cropGrowthBar, floor, crop, building]
-    systems = []
 
-def main():
-    """Main entry point for the game with OpenGL and GLUT."""
-    glutInit(sys.argv)  # Initialize GLUT
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH)  # Display mode: RGB, double-buffered, depth-buffered
-    glutInitWindowSize(800, 600)  # Set window size
-    glutCreateWindow(b"Farming Sim Game")  # Create the OpenGL window
+def create_ui_entities():
+    """Create and return UI entities."""
+    return [
+        HealthBar(),
+        EnergyBar(),
+        HouseIcon(),
+        CropGrowthBar()
+    ]
 
-    # Hide cursor for better FPS controls (optional)
+
+def initialize_entities():
+    """Initialize all game entities."""
+    game_state['player'] = create_player()
+    ui_entities = create_ui_entities()
+    world_entities = create_world_entities()
+    game_state['entities'] = ui_entities + world_entities
+
+
+################################## DEV END ##########################################
+#####################################################################################
+
+def setup_glut_window():
+    """Initialize GLUT window and settings."""
+    glutInit(sys.argv)
+    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH)
+    glutInitWindowSize(800, 600)
+    glutCreateWindow(b"Farming Sim Game")
     glutSetCursor(GLUT_CURSOR_NONE)
 
-    # Initialize OpenGL
+
+def register_callbacks():
+    """Register all GLUT callback functions."""
+    glutDisplayFunc(render_scene)
+    glutIdleFunc(game_loop)
+    glutKeyboardFunc(handle_keyboard_down)
+    glutKeyboardUpFunc(handle_keyboard_up)
+    glutPassiveMotionFunc(handle_mouse_movement)
+    glutMotionFunc(handle_mouse_movement)
+
+
+def initialize_game():
+    """Initialize the complete game."""
+    setup_glut_window()
     setup_opengl()
+    initialize_entities()
+    register_callbacks()
 
-    # Initialize game objects and systems
-    init_game()
 
-    # Register GLUT callbacks
-    glutDisplayFunc(render_scene)  # Display function for rendering
-    glutIdleFunc(idle_func)  # Idle function to keep the game running
-    glutKeyboardFunc(handle_keyboard_down)  # Keyboard key press handler
-    glutKeyboardUpFunc(handle_keyboard_up)  # Keyboard key release handler
-    glutPassiveMotionFunc(handle_mouse)    # Mouse movement handler
-    glutMotionFunc(handle_mouse)           # Mouse movement with button pressed
-    
-    # Start the GLUT main loop
+def main():
+    """Main entry point for the game."""
+    initialize_game()
     glutMainLoop()
+
 
 if __name__ == "__main__":
     main()
